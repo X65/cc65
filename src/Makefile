@@ -8,18 +8,22 @@ ifneq ($(shell echo),)
   CMD_EXE = 1
 endif
 
-PROGS = ar65     \
-        ca65     \
-        cc65     \
-        chrcvt65 \
-        cl65     \
-        co65     \
-        da65     \
-        grc65    \
-        ld65     \
-        od65     \
-        sim65    \
-        sp65
+C_PROGS = ar65     \
+          ca65     \
+          cc65     \
+          chrcvt65 \
+          cl65     \
+          co65     \
+          da65     \
+          grc65    \
+          ld65     \
+          od65     \
+          sim65    \
+          sp65
+
+RUST_PROGS = k816
+
+PROGS = $(C_PROGS) $(RUST_PROGS)
 
 .PHONY: all mostlyclean clean install zip avail unavail bin $(PROGS)
 
@@ -40,10 +44,12 @@ ifdef CMD_EXE
   DIRLIST = $(strip $(foreach dir,$1,$(wildcard $(dir))))
   MKDIR = mkdir $(subst /,\,$1)
   RMDIR = $(if $(DIRLIST),rmdir /s /q $(subst /,\,$(DIRLIST)))
+  COPY = copy /Y $(subst /,\,$1) $(subst /,\,$2)
 else
   NULLDEV = /dev/null
   MKDIR = mkdir -p $1
   RMDIR = $(RM) -r $1
+  COPY = cp $1 $2
 endif
 
 ifeq ($(SILENT),s)
@@ -63,6 +69,25 @@ endif
 
 CC = $(CROSS_COMPILE)gcc
 AR = $(CROSS_COMPILE)ar
+CARGO ?= cargo
+CARGO_TARGET_DIR := $(abspath ../wrk/cargo)
+CARGO_PROFILE ?= release
+
+ifeq ($(CARGO_PROFILE),release)
+  CARGO_PROFILE_ARG = --release
+  CARGO_PROFILE_DIR = release
+else ifeq ($(CARGO_PROFILE),debug)
+  CARGO_PROFILE_ARG =
+  CARGO_PROFILE_DIR = debug
+else
+  CARGO_PROFILE_ARG = --profile $(CARGO_PROFILE)
+  CARGO_PROFILE_DIR = $(CARGO_PROFILE)
+endif
+
+ifdef RUST_TARGET
+  CARGO_TARGET_ARG = --target $(RUST_TARGET)
+  RUST_TARGET_DIR = $(RUST_TARGET)/
+endif
 
 ifdef CROSS_COMPILE
   $(info CC: $(CC))
@@ -192,7 +217,17 @@ $(eval $(call OBJS_template,common))
 	$(if $(QUIET),echo AR:$@)
 	$(AR) r $@ $? $(CATERR)
 
-$(foreach prog,$(PROGS),$(eval $(call PROG_template,$(prog))))
+$(foreach prog,$(C_PROGS),$(eval $(call PROG_template,$(prog))))
+
+../bin/k816$(EXE_SUFFIX): FORCE | ../bin
+	$(if $(QUIET),echo RUST:$@)
+	BUILD_ID="$(BUILD_ID)" $(CARGO) build --manifest-path k816/Cargo.toml --target-dir $(CARGO_TARGET_DIR) $(CARGO_TARGET_ARG) $(CARGO_PROFILE_ARG)
+	$(call COPY,$(CARGO_TARGET_DIR)/$(RUST_TARGET_DIR)$(CARGO_PROFILE_DIR)/k816$(EXE_SUFFIX),$@)
+
+k816: ../bin/k816$(EXE_SUFFIX)
+
+.PHONY: FORCE
+FORCE:
 
 
 .PHONY: dbginfo dbgsh test

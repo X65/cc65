@@ -1,0 +1,3 @@
+[submodule "src/k816"]
+	path = src/k816
+	url = /home/smoku/devel/X65/devel/cc65/../k816
