@@ -20,6 +20,29 @@ jobs:
         run: git config --global core.autocrlf input
       - name: Checkout Source
         uses: actions/checkout@v4
+        with:
+          # src/k816 is a submodule, and `make bin` builds it. Correcting the
+          # URL alone only makes it fetchable; actions/checkout fetches no
+          # submodule unless it is asked to.
+          submodules: recursive
+
+      - name: Install the Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      # `wrk/cargo`, which `make bin` builds k816 into, is deliberately not
+      # cached: the MinGW step at the end of this job runs `make -C src clean`,
+      # which removes `wrk` entirely, so there would be nothing left to save.
+      # `src/k816/target` is where `cargo test` builds, and where the first run
+      # on a new runner pays for tree-sitter and its generated parser.
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src/k816/target
+          key: cargo-${{ runner.os }}-${{ hashFiles('src/k816/Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-
 
       - name: Do some simple style checks
         shell: bash
@@ -30,6 +53,16 @@ jobs:
       - name: Build the tools.
         shell: bash
         run: make -j2 bin USER_CFLAGS=-Werror QUIET=1
+      # After `bin`, because the K816 test suite drives the ca65, ld65 and
+      # cl65 the build just produced.
+      - name: Test k816
+        shell: bash
+        working-directory: src/k816
+        run: |
+          cargo test
+          cargo fmt --all -- --check
+          cargo clippy --all-targets --all-features -- -D warnings
+
       - name: Build the dbginfo example
         shell: bash
         run: make -j2 -C src test QUIET=1

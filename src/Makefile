@@ -21,11 +21,6 @@ C_PROGS = ar65     \
           sim65    \
           sp65
 
-RUST_PROGS = k816
-
-PROGS = $(C_PROGS) $(RUST_PROGS)
-
-.PHONY: all mostlyclean clean install zip avail unavail bin $(PROGS)
 
 .SUFFIXES:
 
@@ -105,8 +100,36 @@ ifndef BUILD_ID
   endif
 endif
 
+# k816 is built by Cargo, which not every contributor to the C tools has and
+# which no cross build here is set up for. It is therefore part of `make bin`
+# only when it can actually be built: `make bin` on a stock machine builds the
+# C tools and says once why k816 is not among them, and `make k816` asks for it
+# explicitly and fails with the reason.
+#
+# A CROSS_COMPILE build leaves it out unconditionally. Renaming a host binary
+# to k816.exe is not a Windows build, and supplying a Rust target is a task
+# nobody has done.
+CARGO_FOUND := $(shell command -v $(CARGO) 2>$(NULLDEV))
+
+ifdef CROSS_COMPILE
+  RUST_PROGS =
+else ifeq ($(CARGO_FOUND),)
+  RUST_PROGS =
+else
+  RUST_PROGS = k816
+endif
+
+PROGS = $(C_PROGS) $(RUST_PROGS)
+
+.PHONY: all mostlyclean clean install zip avail unavail bin k816 $(PROGS)
+
 ifneq ($(SILENT),s)
   $(info BUILD_ID: $(BUILD_ID))
+ifeq ($(RUST_PROGS),)
+ifndef CROSS_COMPILE
+  $(info NOTE: k816 is not built - no Cargo on PATH. The C tools are unaffected.)
+endif
+endif
 endif
 
 CFLAGS += -MMD -MP -O3 -I common \
@@ -224,7 +247,16 @@ $(foreach prog,$(C_PROGS),$(eval $(call PROG_template,$(prog))))
 	BUILD_ID="$(BUILD_ID)" $(CARGO) build --manifest-path k816/Cargo.toml --target-dir $(CARGO_TARGET_DIR) $(CARGO_TARGET_ARG) $(CARGO_PROFILE_ARG)
 	$(call COPY,$(CARGO_TARGET_DIR)/$(RUST_TARGET_DIR)$(CARGO_PROFILE_DIR)/k816$(EXE_SUFFIX),$@)
 
+# Asked for by name, k816 is built whether or not it is in RUST_PROGS - and
+# says why it cannot be, rather than reporting a missing Cargo.toml or a
+# command not found from three lines into a recipe.
+ifeq ($(RUST_PROGS),)
+k816:
+	@echo 'k816 needs Cargo, and $(if $(CROSS_COMPILE),this is a CROSS_COMPILE build - k816 has no cross build,none was found on PATH (set CARGO, or install Rust from https://rustup.rs)).' >&2
+	@false
+else
 k816: ../bin/k816$(EXE_SUFFIX)
+endif
 
 .PHONY: FORCE
 FORCE:

@@ -4,7 +4,7 @@ ifneq ($(SILENT),s)
     $(info Using Makefile: $(realpath $(firstword $(MAKEFILE_LIST))) $(MAKECMDGOALS))
 endif
 
-.PHONY: all mostlyclean clean install zip avail unavail bin lib doc html info samples test util checkstyle check checkprefix
+.PHONY: all mostlyclean clean install zip avail unavail bin lib doc html info samples test util checkstyle check checkprefix k816
 
 .SUFFIXES:
 
@@ -66,6 +66,11 @@ samples:
 
 util:
 	@$(MAKE) -C util       --no-print-directory $@
+
+# k816 does not end in 65, and the pattern below cannot be widened without
+# catching every library goal, so it gets a rule of its own.
+k816:
+	@$(MAKE) -C src        --no-print-directory $@
 
 %65:
 	@$(MAKE) -C src        --no-print-directory $@
