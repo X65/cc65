@@ -330,10 +330,13 @@ command lines, not one.
 
 The unit set is collected by scanning the command line from the first K816
 file onwards, and the scan cannot know which options take a separate value.
-A bare token with a K816 extension that is really an option's value - as in
-<tt/-o out.k65/ - is therefore counted as a unit as well, and fails when k816
-is asked to compile it. No such command line means anything; name the output
-something else.
+A bare token with a K816 extension that is really an option's value is
+therefore counted as a unit as well - but only if it appears <em/after/ the
+first K816 file, since the scan starts there. So <tt/cl65 -o out.k65
+main.k816/ is fine and <tt/cl65 main.k816 -o out.k65/ is not: k816 is asked
+to read <tt/out.k65/ as a sibling unit and says it cannot. No such command
+line means anything; write the option before the first source file, or name
+the output something else.
 
 Note that this reaches further than the left-to-right rule above: options to
 the left of a K816 file apply to it and options to its right do not, but K816
