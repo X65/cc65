@@ -52,7 +52,8 @@ typedef enum {
     FILETYPE_OBJ,               /* Object file */
     FILETYPE_LIB,               /* Library file */
     FILETYPE_GR,                /* GEOS resource file */
-    FILETYPE_O65                /* O65 object file */
+    FILETYPE_O65,               /* O65 object file */
+    FILETYPE_K816               /* K816 source file */
 } FILETYPE;
 
 

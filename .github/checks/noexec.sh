@@ -15,7 +15,7 @@ while IFS= read -r FILE; do
         echo "$FILE" >&2
         FOUND=1
     fi
-done < <(find $CHECK_PATH -type f \( -name \*.inc -o -name Makefile -o -name \*.cfg -o -name \*.\[chs\] -o -name \*.mac -o -name \*.asm -o -name \*.sgml \) -print)
+done < <(find $CHECK_PATH -type f \( -name \*.inc -o -name Makefile -o -name \*.cfg -o -name \*.\[chs\] -o -name \*.mac -o -name \*.asm -o -name \*.sgml \) -print | grep -v "wrk/" | grep -v "/target/")
 
 cd "$OLDCWD"
 

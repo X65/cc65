@@ -8,7 +8,8 @@
 <abstract>
 cl65 is the compile &amp; link utility for cc65, the 6502 C compiler. It was
 designed as a smart frontend for the C compiler (cc65), the assembler (ca65),
-the object file converter (co65), and the linker (ld65).
+the object file converter (co65), the K816 compiler (k816), and the linker
+(ld65).
 </abstract>
 
 <!-- Table of contents -->
@@ -18,8 +19,8 @@ the object file converter (co65), and the linker (ld65).
 
 <sect>Overview<p>
 
-cl65 is a frontend for cc65, ca65, co65 and ld65. While you may not use the
-full power of the tools when calling them through cl65, most features are
+cl65 is a frontend for cc65, ca65, co65, k816 and ld65. While you may not use
+the full power of the tools when calling them through cl65, most features are
 available, and the use of cl65 is much simpler.
 
 
@@ -64,6 +65,7 @@ Short options:
   -W name[,...]                 Suppress compiler warnings
   -Wa options                   Pass options to the assembler
   -Wc options                   Pass options to the compiler
+  -Wk option                    Pass one option to the K816 compiler
   -Wl options                   Pass options to the linker
 
 Long options:
@@ -94,6 +96,7 @@ Long options:
   --force-import sym            Force an import of symbol 'sym'
   --help                        Help (this text)
   --include-dir dir             Set a compiler include directory path
+  --k816-arg option             Pass one option to the K816 compiler
   --ld-args options             Pass options to the linker
   --lib-path path               Specify a library search path
   --list-targets                List all available targets
@@ -218,6 +221,20 @@ There are a few remaining options that control the behaviour of cl65:
   compiler by means of the <tt/-Wc/ switch.
 
 
+  <tag><tt>-Wk option, --k816-arg option</tt></tag>
+
+  Pass one option directly to the K816 compiler. Unlike <tt/-Wa/, <tt/-Wc/
+  and <tt/-Wl/, this switch forwards its argument as a single argument and
+  does <em/not/ split it at commas: a comma is data inside a K816 option value,
+  as in <tt/--entry=native,a8,i8/. Repeat the switch to pass two arguments
+  (<tt/-Wk --entry -Wk native,a8,i8/), although the same thing is said more
+  simply as one element, <tt/-Wk --entry=native,a8,i8/.
+
+  cl65 has no options of its own for the K816 compiler; every K816 option is
+  spelled the way k816 spells it and reaches it through this switch. The
+  <tt/compile/ subcommand is supplied by cl65 and must not be passed here.
+
+
   <tag><tt>-Wl options, --ld-args options</tt></tag>
 
   Pass options directly to the linker. This may be used to pass options that
@@ -277,10 +294,73 @@ The type of an input file is derived from its extension:
 <item>Libraries: <tt/.a/, <tt/.lib/
 <item>GEOS resource files: <tt/.grc/
 <item>o65 files: <tt/.o65/, <tt/.emd/, <tt/.joy/, <tt/.tgi/
+<item>K816 files: <tt/.k816/, <tt/.k65/
 </itemize>
 
 Please note that the program cannot handle input files with unknown file
 extensions.
+
+
+<sect>K816 files<p>
+
+A file with a <tt/.k816/ or <tt/.k65/ extension is compiled by k816 into an
+assembler file, which is then assembled by ca65 exactly as a C file's output
+is. Both extensions name the same language and the same compiler: k816 accepts
+the K816 superset by default whichever one you write, and <tt/--strict-k65/ -
+passed with <tt/-Wk/ - is what restricts it to the original K65 language.
+
+<sect1>One command line is one program<p>
+
+K65 has no import syntax, so which files are compiled together is build
+structure rather than something a source file states. cl65 takes it from the
+command line: <em/every/ K816 file on one cl65 command line is a unit of one
+program, and when cl65 compiles one of them it passes each of the others to
+k816 as a <tt/--unit/ sibling. A name one unit defines is therefore resolved
+in another, and the address size of an imported symbol reaches the
+instruction that references it.
+
+<tscreen><verb>
+        cl65 -t none --no-target-lib -C game.cfg -o game.bin              startup.asm main.k816 sprites.k816
+</verb></tscreen>
+
+Here <tt/main.k816/ is compiled with <tt/--unit sprites.k816/ and
+<tt/sprites.k816/ with <tt/--unit main.k816/, and both objects are linked in
+the order they appear. Two programs that share an include are two cl65
+command lines, not one.
+
+The unit set is collected by scanning the command line from the first K816
+file onwards, and the scan cannot know which options take a separate value.
+A bare token with a K816 extension that is really an option's value - as in
+<tt/-o out.k65/ - is therefore counted as a unit as well, and fails when k816
+is asked to compile it. No such command line means anything; name the output
+something else.
+
+Note that this reaches further than the left-to-right rule above: options to
+the left of a K816 file apply to it and options to its right do not, but K816
+files to its right are still units of its program.
+
+<sect1>Targets, configurations and libraries<p>
+
+There is no cc65 target for a K816 machine, and k816 is never passed <tt/-t/:
+the entry environment is stated with k816's own <tt/--entry/ option, forwarded
+with <tt/-Wk/. What a K816 build does state is the layout, because ld65 needs
+one:
+
+<tscreen><verb>
+        cl65 -t none --no-target-lib -C layout.cfg startup.asm main.k816
+</verb></tscreen>
+
+<tt/-t none/ because the default target is c64, and ld65 would otherwise look
+for <tt/c64.cfg/ and link <tt/c64.lib/ into a program that has no C runtime;
+<tt/--no-target-lib/ because <tt/-C/ replaces the target's configuration but
+not its library, and there is no <tt/none.lib/ to link. Both are properties of
+the command you write rather than special cases cl65 infers from the presence
+of a K816 file.
+
+k816 emits its own <tt/.setcpu "65816"/, so <tt/--cpu/ is unnecessary. When
+the intermediate assembler file is assembled, cl65 passes ca65 a
+<tt/--bin-include-dir/ naming the K816 source's own directory, which is where
+k816 resolved the path of any <tt/binary/ entry the source included.
 
 
 <sect>Examples<p>

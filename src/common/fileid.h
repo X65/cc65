@@ -46,10 +46,15 @@
 
 /* An entry for a table that maps extensions to some sort of identifier. Such
 ** a table - sorted alphabetically - is passed to GetFileId.
+**
+** Ext must have room for the terminator: an initializer whose string exactly
+** fills the array is legal C and quietly drops the '\0', after which
+** CompareFileId's strcmp runs off the end into Id. The longest extension in
+** any table is "k816" (four characters), so five is the size.
 */
 typedef struct FileId FileId;
 struct FileId {
-    const char  Ext[4];
+    const char  Ext[5];
     int         Id;
 };
 

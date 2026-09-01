@@ -112,6 +112,7 @@ static CmdDesc CA65 = { 0, 0, 0, 0, 0, 0, 0 };
 static CmdDesc CO65 = { 0, 0, 0, 0, 0, 0, 0 };
 static CmdDesc LD65 = { 0, 0, 0, 0, 0, 0, 0 };
 static CmdDesc GRC  = { 0, 0, 0, 0, 0, 0, 0 };
+static CmdDesc K816 = { 0, 0, 0, 0, 0, 0, 0 };
 
 /* Pseudo-command to track files we want to delete */
 static CmdDesc RM   = { 0, 0, 0, 0, 0, 0, 0 };
@@ -149,6 +150,16 @@ static int Module = 0;
 /* Name of the target specific runtime library */
 static char* TargetLib   = 0;
 static int   NoTargetLib = 0;
+
+/* The K816 source files on the command line. K65 has no import syntax, so
+** which files are compiled together is build structure that has to be
+** stated, and the command line is where it is stated: every K816 file on one
+** cl65 command line is a unit of one program, and each is compiled with the
+** others as --unit siblings. Filled once, by ScanK816Units().
+*/
+static const char** K816Units     = 0;
+static unsigned     K816UnitCount = 0;
+static int          K816UnitsKnown = 0;
 
 
 
@@ -765,6 +776,113 @@ static void CompileRes (const char* File)
 
 
 
+static void ScanK816Units (unsigned Index)
+/* Collect the K816 source files of the command line, starting at Index.
+**
+** Called with the index of the *first* K816 file, so everything before it has
+** already been processed and, by construction, none of it was a K816 file.
+** The scan is over the argument vector rather than over the files cl65 has
+** already dispatched, because a unit set is only complete once the whole
+** command line has been read - and cl65 processes arguments left to right.
+**
+** The scan cannot know which options take a separate value, so a bare token
+** with a K816 extension that is an option's value ("-o out.k65") is counted
+** as a unit too. No such command line means anything, and cl65.sgml says so;
+** the alternative is a second copy of every option's arity.
+*/
+{
+    unsigned I;
+
+    /* The unit set is one program's, so it is scanned once */
+    if (K816UnitsKnown) {
+        return;
+    }
+    K816UnitsKnown = 1;
+
+    K816Units = xmalloc ((ArgCount - Index) * sizeof (const char*));
+    for (I = Index; I < ArgCount; ++I) {
+        const char* Arg = ArgVec[I];
+        if (Arg[0] != '-' && GetTypeOfFile (Arg) == FILETYPE_K816) {
+            K816Units[K816UnitCount++] = Arg;
+        }
+    }
+}
+
+
+
+static void CompileK816 (const char* File)
+/* Compile the given K816 source file */
+{
+    /* A temporary file name passed to the assembler */
+    char* TmpFile = NULL;
+
+    /* Remember the current compiler argument count. It already holds the
+    ** "compile" subcommand and every option -Wk put in force.
+    */
+    unsigned ArgCount = K816.ArgCount;
+    unsigned I;
+
+    /* Every other K816 file on the command line is a sibling unit */
+    for (I = 0; I < K816UnitCount; ++I) {
+        if (strcmp (K816Units[I], File) != 0) {
+            CmdAddArg2 (&K816, "--unit", K816Units[I]);
+        }
+    }
+
+    /* Add the file as argument for the compiler */
+    CmdAddArg (&K816, File);
+
+    if (DoAssemble) {
+        /* Set a temporary output file name */
+        TmpFile = MakeTmpFilename (OutputDirectory, File, ".s");
+        CmdSetOutput (&K816, TmpFile);
+    } else if (OutputName) {
+        /* We won't assemble, so this is the final step and an output name
+        ** was given. Without one, k816 writes the source's name with ".s"
+        ** in place of its extension, which is what cc65 does for C.
+        */
+        CmdSetOutput (&K816, OutputName);
+    }
+
+    /* Add a NULL pointer to terminate the argument list */
+    CmdAddArg (&K816, 0);
+
+    /* Run the compiler */
+    ExecProgram (&K816);
+
+    /* Remove the excess arguments */
+    CmdDelArgs (&K816, ArgCount);
+
+    /* If this is not the final step, assemble the generated file, then
+    ** remove it
+    */
+    if (DoAssemble) {
+        /* A "binary" entry becomes an .incbin of the path the source wrote,
+        ** and k816 checked that path against the source's own directory. The
+        ** generated assembly is somewhere else, so that directory is what
+        ** ca65 has to search. Passed for every K816 file rather than only for
+        ** one that has a "binary", because the alternative is cl65 reading
+        ** K816 sources.
+        */
+        unsigned AsmArgCount = CA65.ArgCount;
+        char* SourceDir = GetFileDirectory (File);
+        CmdAddArg2 (&CA65, "--bin-include-dir", SourceDir? SourceDir : ".");
+        xfree (SourceDir);
+
+        /* Assemble the intermediate file and remove it */
+        AssembleIntermediate (File, TmpFile);
+
+        /* The directory applies to this file only */
+        CmdDelArgs (&CA65, AsmArgCount);
+
+        if (TmpFile) {
+            xfree (TmpFile);
+        }
+    }
+}
+
+
+
 static void ConvertO65 (const char* File)
 /* Convert an o65 object file into an assembler file */
 {
@@ -842,6 +960,7 @@ static void Usage (void)
             "  -W name[,...]\t\t\tSuppress compiler warnings\n"
             "  -Wa options\t\t\tPass options to the assembler\n"
             "  -Wc options\t\t\tPass options to the compiler\n"
+            "  -Wk option\t\t\tPass one option to the K816 compiler\n"
             "  -Wl options\t\t\tPass options to the linker\n"
             "\n"
             "Long options:\n"
@@ -872,6 +991,7 @@ static void Usage (void)
             "  --force-import sym\t\tForce an import of symbol 'sym'\n"
             "  --help\t\t\tHelp (this text)\n"
             "  --include-dir dir\t\tSet a compiler include directory path\n"
+            "  --k816-arg option\t\tPass one option to the K816 compiler\n"
             "  --ld-args options\t\tPass options to the linker\n"
             "  --lib-path path\t\tSpecify a library search path\n"
             "  --list-targets\t\tList all available targets\n"
@@ -1149,6 +1269,19 @@ static void OptIncludeDir (const char* Opt attribute ((unused)), const char* Arg
 /* Include directory (compiler) */
 {
     CmdAddArg2 (&CC65, "-I", Arg);
+}
+
+
+
+static void OptK816Arg (const char* Opt attribute ((unused)), const char* Arg)
+/* Pass one argument to the K816 compiler */
+{
+    /* CmdAddArg, not CmdAddArgList: a comma separates arguments for the other
+    ** pass-throughs, but it is data inside a K816 option value
+    ** ("--entry=native,a8,i8"). One -Wk is therefore one argv element, and two
+    ** argv elements are two -Wk.
+    */
+    CmdAddArg (&K816, Arg);
 }
 
 
@@ -1490,6 +1623,7 @@ int main (int argc, char* argv [])
         { "--force-import",        1, OptForceImport        },
         { "--help",                0, OptHelp               },
         { "--include-dir",         1, OptIncludeDir         },
+        { "--k816-arg",            1, OptK816Arg            },
         { "--ld-args",             1, OptLdArgs             },
         { "--lib-path",            1, OptLibPath            },
         { "--list-targets",        0, OptListTargets        },
@@ -1548,7 +1682,14 @@ int main (int argc, char* argv [])
     CmdInit (&CO65, CmdPath, "co65");
     CmdInit (&LD65, CmdPath, "ld65");
     CmdInit (&GRC,  CmdPath, "grc65");
+    CmdInit (&K816, CmdPath, "k816");
     xfree (CmdPath);
+
+    /* k816 dispatches a subcommand before it parses any option, so the
+    ** subcommand is permanent argv state: it goes in before the command line
+    ** is read, and every option -Wk forwards lands after it.
+    */
+    CmdAddArg (&K816, "compile");
 
     /* Our default target is the C64 instead of "none" */
     Target = TGT_C64;
@@ -1633,6 +1774,9 @@ int main (int argc, char* argv [])
                         /* -Wc: Pass options to compiler */
                         /* Remember -Wc sub arguments in cc65 arg struct */
                         OptCCArgs (Arg, GetArg (&I, 3));
+                    } else if (Arg[2] == 'k' && Arg[3] == '\0') {
+                        /* -Wk: Pass one option to the K816 compiler */
+                        OptK816Arg (Arg, GetArg (&I, 3));
                     } else if (Arg[2] == 'l' && Arg[3] == '\0') {
                         /* -Wl: Pass options to linker */
                         OptLdArgs (Arg, GetArg (&I, 3));
@@ -1748,6 +1892,14 @@ int main (int argc, char* argv [])
                 case FILETYPE_O65:
                     /* Add the object file converter files */
                     ConvertO65 (Arg);
+                    break;
+
+                case FILETYPE_K816:
+                    /* Compile the file, with every other K816 file on the
+                    ** command line as a sibling unit
+                    */
+                    ScanK816Units (I);
+                    CompileK816 (Arg);
                     break;
 
                 default:
