@@ -309,38 +309,44 @@ is. Both extensions name the same language and the same compiler: k816 accepts
 the K816 superset by default whichever one you write, and <tt/--strict-k65/ -
 passed with <tt/-Wk/ - is what restricts it to the original K65 language.
 
-<sect1>One command line is one program<p>
+<sect1>Units name each other<p>
 
-K65 has no import syntax, so which files are compiled together is build
-structure rather than something a source file states. cl65 takes it from the
-command line: <em/every/ K816 file on one cl65 command line is a unit of one
-program, and when cl65 compiles one of them it passes each of the others to
-k816 as a <tt/--unit/ sibling. A name one unit defines is therefore resolved
-in another, and the address size of an imported symbol reaches the
-instruction that references it.
+Which files are compiled together is stated in the sources: a K816 unit names
+the units it may see with <tt/import/, and cl65 hands k816 one file and
+nothing about the others.
+
+<tscreen><verb>
+        // main.k816
+        import "sprites.k816"
+
+        func main @a8 @i8 {
+            call draw
+        }
+</verb></tscreen>
 
 <tscreen><verb>
         cl65 -t none --no-target-lib -C game.cfg -o game.bin              startup.asm main.k816 sprites.k816
 </verb></tscreen>
 
-Here <tt/main.k816/ is compiled with <tt/--unit sprites.k816/ and
-<tt/sprites.k816/ with <tt/--unit main.k816/, and both objects are linked in
-the order they appear. Two programs that share an include are two cl65
-command lines, not one.
+Both K816 files are compiled and both objects are linked, in the order they
+appear - which is the same rule cl65 applies to a C or an assembler file, and
+all cl65 does with a K816 one. A name <tt/sprites.k816/ defines is resolved in
+<tt/main.k816/ because <tt/main.k816/ said so, not because they were written
+on one line.
 
-The unit set is collected by scanning the command line from the first K816
-file onwards, and the scan cannot know which options take a separate value.
-A bare token with a K816 extension that is really an option's value is
-therefore counted as a unit as well - but only if it appears <em/after/ the
-first K816 file, since the scan starts there. So <tt/cl65 -o out.k65
-main.k816/ is fine and <tt/cl65 main.k816 -o out.k65/ is not: k816 is asked
-to read <tt/out.k65/ as a sibling unit and says it cannot. No such command
-line means anything; write the option before the first source file, or name
-the output something else.
+A unit sees what it imports <em/directly/ and nothing further. If
+<tt/main.k816/ imports <tt/sprites.k816/ and that imports <tt/palette.k816/,
+then <tt/main.k816/ cannot name <tt/palette.k816/'s symbols without importing
+it too. The whole closure is still read - a unit two imports away decides
+contracts this compilation is built against - and is still a build dependency
+of the object; what it is not is visible. That is what makes a unit mean one
+thing: <tt/sprites.k816/ resolves the same names whether it is the file being
+compiled or a file <tt/main.k816/ reached.
 
-Note that this reaches further than the left-to-right rule above: options to
-the left of a K816 file apply to it and options to its right do not, but K816
-files to its right are still units of its program.
+A file that is imported need not be named on the command line, and one that
+is named there is compiled whether or not anything imports it. An interface
+unit - a file of nothing but <tt/extern/ declarations - is usually only
+imported, so it is left off the line and no object is produced for it.
 
 <sect1>Targets, configurations and libraries<p>
 
@@ -369,26 +375,22 @@ k816 resolved the path of any <tt/binary/ entry the source included.
 
 <tt/--create-dep/ and <tt/--create-full-dep/ work for a K816 file as they do
 for a C or an assembler one, and it is k816 that writes them - not ca65. The
-dependencies of a K816 object are the source, the sibling units it was
-compiled with, and every file a <tt/binary/ includes, and only k816 knows the
+dependencies of a K816 object are the source, every unit it imports -
+transitively - and every file a <tt/binary/ includes, and only k816 knows the
 last two: the emitted <tt/.incbin/ carries the path as the source wrote it.
 The rule names the object file rather than the intermediate assembly, which
 cl65 removes.
 
-This is what makes cl65 usable from a build generator. For CMake, adding the
-extensions to the assembler language is enough to build a single-unit program:
+This is what makes cl65 usable from a build generator, and for CMake adding
+the extensions to the assembler language is the whole of it:
 
 <tscreen><verb>
         set( CMAKE_ASM_SOURCE_FILE_EXTENSIONS s;asm;k65;k816 )
 </verb></tscreen>
 
-A program of several K816 units needs more, because a generator compiles one
-source per invocation and the unit rule above takes the set from the command
-line. Name the siblings explicitly for each source:
-
-<tscreen><verb>
-        cl65 -c -Wk --unit=sprites.k816 -o main.o main.k816
-</verb></tscreen>
+A generator compiles one source per invocation and has nothing to compute:
+the source says which units it belongs with, and the dependency file names
+them so that editing one rebuilds the other.
 
 
 <sect>Examples<p>

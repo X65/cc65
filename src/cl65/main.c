@@ -151,18 +151,6 @@ static int Module = 0;
 static char* TargetLib   = 0;
 static int   NoTargetLib = 0;
 
-/* The K816 source files on the command line. K65 has no import syntax, so
-** which files are compiled together is build structure that has to be
-** stated, and the command line is where it is stated: every K816 file on one
-** cl65 command line is a unit of one program, and each is compiled with the
-** others as --unit siblings. Filled once, by ScanK816Units().
-*/
-static const char** K816Units     = 0;
-static unsigned     K816UnitCount = 0;
-static int          K816UnitsKnown = 0;
-
-
-
 /*****************************************************************************/
 /*                Include the system specific spawn function                 */
 /*****************************************************************************/
@@ -773,43 +761,6 @@ static void CompileRes (const char* File)
         }
     }
 }
-
-
-
-static void ScanK816Units (unsigned Index)
-/* Collect the K816 source files of the command line, starting at Index.
-**
-** Called with the index of the *first* K816 file, so everything before it has
-** already been processed and, by construction, none of it was a K816 file.
-** The scan is over the argument vector rather than over the files cl65 has
-** already dispatched, because a unit set is only complete once the whole
-** command line has been read - and cl65 processes arguments left to right.
-**
-** The scan cannot know which options take a separate value, so a bare token
-** with a K816 extension that is an option's value ("-o out.k65") is counted
-** as a unit too. No such command line means anything, and cl65.sgml says so;
-** the alternative is a second copy of every option's arity.
-*/
-{
-    unsigned I;
-
-    /* The unit set is one program's, so it is scanned once */
-    if (K816UnitsKnown) {
-        return;
-    }
-    K816UnitsKnown = 1;
-
-    K816Units = xmalloc ((ArgCount - Index) * sizeof (const char*));
-    for (I = Index; I < ArgCount; ++I) {
-        const char* Arg = ArgVec[I];
-        if (Arg[0] != '-' && GetTypeOfFile (Arg) == FILETYPE_K816) {
-            K816Units[K816UnitCount++] = Arg;
-        }
-    }
-}
-
-
-
 static void CompileK816 (const char* File)
 /* Compile the given K816 source file */
 {
@@ -820,14 +771,6 @@ static void CompileK816 (const char* File)
     ** "compile" subcommand and every option -Wk put in force.
     */
     unsigned ArgCount = K816.ArgCount;
-    unsigned I;
-
-    /* Every other K816 file on the command line is a sibling unit */
-    for (I = 0; I < K816UnitCount; ++I) {
-        if (strcmp (K816Units[I], File) != 0) {
-            CmdAddArg2 (&K816, "--unit", K816Units[I]);
-        }
-    }
 
     /* Dependencies are k816's to report, not ca65's: what makes the object
     ** stale is this source, the sibling units it was compiled with, and the
@@ -1928,10 +1871,10 @@ int main (int argc, char* argv [])
                     break;
 
                 case FILETYPE_K816:
-                    /* Compile the file, with every other K816 file on the
-                    ** command line as a sibling unit
+                    /* Compile the file. Which other units it belongs with is
+                    ** stated in its own source, with `import`, so cl65 hands
+                    ** the compiler one file and nothing about the others.
                     */
-                    ScanK816Units (I);
                     CompileK816 (Arg);
                     break;
 
