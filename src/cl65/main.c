@@ -829,6 +829,39 @@ static void CompileK816 (const char* File)
         }
     }
 
+    /* Dependencies are k816's to report, not ca65's: what makes the object
+    ** stale is this source, the sibling units it was compiled with, and the
+    ** files a `binary` includes - and only k816 knows the last two. This is
+    ** the same division as for a C file, where cc65 writes the dependencies
+    ** and AssembleIntermediate deliberately does not ask ca65 for a second
+    ** set. OptCreateDep put the names in DepName/FullDepName; adding the
+    ** options here rather than there keeps them out of a k816 that is not
+    ** being run.
+    */
+    if (DepName && *DepName) {
+        CmdAddArg2 (&K816, "--create-dep", DepName);
+    }
+    if (FullDepName && *FullDepName) {
+        CmdAddArg2 (&K816, "--create-full-dep", FullDepName);
+    }
+    if (DepName || FullDepName) {
+        /* The dependency target is what the build tracks. When we assemble,
+        ** that is the object file and not the intermediate assembly, which
+        ** is removed - the same choice Compile() makes for C.
+        */
+        if (!DoAssemble) {
+            if (OutputName) {
+                CmdAddArg2 (&K816, "--dep-target", OutputName);
+            }
+        } else if (!DoLink && OutputName) {
+            CmdAddArg2 (&K816, "--dep-target", OutputName);
+        } else {
+            char* ObjName = MakeFilename (File, ".o");
+            CmdAddArg2 (&K816, "--dep-target", ObjName);
+            xfree (ObjName);
+        }
+    }
+
     /* Add the file as argument for the compiler */
     CmdAddArg (&K816, File);
 

@@ -365,6 +365,31 @@ the intermediate assembler file is assembled, cl65 passes ca65 a
 <tt/--bin-include-dir/ naming the K816 source's own directory, which is where
 k816 resolved the path of any <tt/binary/ entry the source included.
 
+<sect1>Dependencies<p>
+
+<tt/--create-dep/ and <tt/--create-full-dep/ work for a K816 file as they do
+for a C or an assembler one, and it is k816 that writes them - not ca65. The
+dependencies of a K816 object are the source, the sibling units it was
+compiled with, and every file a <tt/binary/ includes, and only k816 knows the
+last two: the emitted <tt/.incbin/ carries the path as the source wrote it.
+The rule names the object file rather than the intermediate assembly, which
+cl65 removes.
+
+This is what makes cl65 usable from a build generator. For CMake, adding the
+extensions to the assembler language is enough to build a single-unit program:
+
+<tscreen><verb>
+        set( CMAKE_ASM_SOURCE_FILE_EXTENSIONS s;asm;k65;k816 )
+</verb></tscreen>
+
+A program of several K816 units needs more, because a generator compiles one
+source per invocation and the unit rule above takes the set from the command
+line. Name the siblings explicitly for each source:
+
+<tscreen><verb>
+        cl65 -c -Wk --unit=sprites.k816 -o main.o main.k816
+</verb></tscreen>
+
 
 <sect>Examples<p>
 
