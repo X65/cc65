@@ -305,9 +305,12 @@ extensions.
 
 A file with a <tt/.k816/, <tt/.k65/ or <tt/.kk/ extension is compiled by k816
 into an assembler file, which is then assembled by ca65 exactly as a C file's
-output is. All three extensions name the same language and the same compiler:
-k816 accepts the K816 superset by default whichever one you write, and
-<tt/--strict-k65/ - passed with <tt/-Wk/ - is what restricts it to the original
+output is. All three extensions name the same compiler and the same grammar,
+and the extension names the dialect: a <tt/.k65/ source keeps the original K65
+spellings of four forms K816 writes its own way - the postfix loop, the signed
+flag test, the overflow relations and the stack shorthand - and a <tt/.kk/ or
+<tt/.k816/ source refuses them, each with a fix that writes the K816 form.
+<tt/--strict-k65/ - passed with <tt/-Wk/ - restricts a source to the original
 K65 language. <tt/.kk/ is what <tt/k816 convert/ writes.
 
 <sect1>Units name each other<p>
