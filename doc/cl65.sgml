@@ -294,7 +294,7 @@ The type of an input file is derived from its extension:
 <item>Libraries: <tt/.a/, <tt/.lib/
 <item>GEOS resource files: <tt/.grc/
 <item>o65 files: <tt/.o65/, <tt/.emd/, <tt/.joy/, <tt/.tgi/
-<item>K816 files: <tt/.k816/, <tt/.k65/
+<item>K816 files: <tt/.k816/, <tt/.k65/, <tt/.kk/
 </itemize>
 
 Please note that the program cannot handle input files with unknown file
@@ -303,11 +303,12 @@ extensions.
 
 <sect>K816 files<p>
 
-A file with a <tt/.k816/ or <tt/.k65/ extension is compiled by k816 into an
-assembler file, which is then assembled by ca65 exactly as a C file's output
-is. Both extensions name the same language and the same compiler: k816 accepts
-the K816 superset by default whichever one you write, and <tt/--strict-k65/ -
-passed with <tt/-Wk/ - is what restricts it to the original K65 language.
+A file with a <tt/.k816/, <tt/.k65/ or <tt/.kk/ extension is compiled by k816
+into an assembler file, which is then assembled by ca65 exactly as a C file's
+output is. All three extensions name the same language and the same compiler:
+k816 accepts the K816 superset by default whichever one you write, and
+<tt/--strict-k65/ - passed with <tt/-Wk/ - is what restricts it to the original
+K65 language. <tt/.kk/ is what <tt/k816 convert/ writes.
 
 <sect1>Units name each other<p>
 
@@ -385,7 +386,7 @@ This is what makes cl65 usable from a build generator, and for CMake adding
 the extensions to the assembler language is the whole of it:
 
 <tscreen><verb>
-        set( CMAKE_ASM_SOURCE_FILE_EXTENSIONS s;asm;k65;k816 )
+        set( CMAKE_ASM_SOURCE_FILE_EXTENSIONS s;asm;k65;k816;kk )
 </verb></tscreen>
 
 A generator compiles one source per invocation and has nothing to compute:
