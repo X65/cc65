@@ -44,7 +44,7 @@ else
   NULLDEV = /dev/null
   MKDIR = mkdir -p $1
   RMDIR = $(RM) -r $1
-  COPY = cp $1 $2
+  COPY = cp -f $1 $2
 endif
 
 ifeq ($(SILENT),s)
