@@ -347,10 +347,12 @@ of the object; what it is not is visible. That is what makes a unit mean one
 thing: <tt/sprites.k816/ resolves the same names whether it is the file being
 compiled or a file <tt/main.k816/ reached.
 
-A file that is imported need not be named on the command line, and one that
-is named there is compiled whether or not anything imports it. An interface
-unit - a file of nothing but <tt/extern/ declarations - is usually only
-imported, so it is left off the line and no object is produced for it.
+Importing a unit does not put it in the link. A unit whose code or data the
+program uses has to be named on the command line, or ld65 reports its symbols
+as unresolved externals; one that is named there is compiled whether or not
+anything imports it. Only an interface unit - a file of nothing but
+<tt/extern/ declarations - is left off the line, since no object is produced
+for it.
 
 <sect1>Targets, configurations and libraries<p>
 
@@ -385,16 +387,11 @@ last two: the emitted <tt/.incbin/ carries the path as the source wrote it.
 The rule names the object file rather than the intermediate assembly, which
 cl65 removes.
 
-This is what makes cl65 usable from a build generator, and for CMake adding
-the extensions to the assembler language is the whole of it:
-
-<tscreen><verb>
-        set( CMAKE_ASM_SOURCE_FILE_EXTENSIONS s;asm;k65;k816;kk )
-</verb></tscreen>
-
-A generator compiles one source per invocation and has nothing to compute:
-the source says which units it belongs with, and the dependency file names
-them so that editing one rebuilds the other.
+A build generator that reads make-style dependency files can use it, once it
+is told to pass <tt/--create-dep/. It also has to be told that cl65 is the
+compiler for the K816 extensions, and the <tt/-t none --no-target-lib -C/
+options above: adding the extensions to CMake's assembler language does none
+of that, and no CMake integration is shipped.
 
 
 <sect>Examples<p>
